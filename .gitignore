@@ -1,0 +1,34 @@
+# --- Database & Environment ---
+.env
+config.php
+# (Add any other files containing DB_PASSWORD or API_KEYS)
+
+# --- Dependency Managers ---
+/vendor/
+composer.phar
+.phpunit.result.cache
+
+# --- OS Generated Files ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- IDE & Editor Files ---
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# --- Logs & Temp Files ---
+*.log
+/logs/
+/tmp/
+/temp/
+/cache/
+
+# --- MySQL Specific ---
+*.sql
+*.sqlite
+# Optional: Ignore local database exports
+/db_backups/
