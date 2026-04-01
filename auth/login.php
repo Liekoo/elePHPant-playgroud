@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .logo { font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
     .logo span { color: var(--text); }
     .subtitle { font-size: 13px; color: var(--muted); font-family: var(--mono); margin-bottom: 36px; }
-    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
     label { font-size: 11px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
     input {
       background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
@@ -77,6 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       color: var(--danger); padding: 12px 16px; border-radius: 10px;
       font-size: 13px; font-family: var(--mono); margin-bottom: 20px;
     }
+    .footer-link { text-align: center; margin-top: 20px; font-size: 13px; color: var(--muted); }
+    .footer-link a { color: var(--accent); text-decoration: none; font-weight: 600; }
+    .footer-link a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -97,6 +100,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
     <button type="submit" class="btn">Sign In</button>
   </form>
+  <div class="footer-link">
+    No account yet? <a href="register.php">Register</a>
+  </div>
 </div>
 </body>
 </html>
