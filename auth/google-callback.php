@@ -34,8 +34,7 @@ if (isset($_GET['code'])) {
         $name = $user_info['name'];
         $google_id = $user_info['id'];
 
-        // 3. Database Logic: Check if the user already exists
-        // Note: Using 'users' in lowercase to avoid the InfinityFree case-sensitivity error!
+        // 3. Database Logic
         $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
@@ -44,15 +43,24 @@ if (isset($_GET['code'])) {
         if ($result->num_rows > 0) {
             // User exists -> Log them in
             $user = $result->fetch_assoc();
-            // Assuming your primary key is 'User_ID' based on our previous troubleshooting. 
-            // Change this to 'user_id' if you made everything lowercase.
-            $_SESSION['user_id'] = $user['User_ID']; 
+            $_SESSION['user_id']   = $user['User_ID']; 
+            $_SESSION['username']  = $user['Username'];
+            $_SESSION['full_name'] = $user['Full_Name'];
+            $_SESSION['role']      = $user['Role']; // This fixes the Warning!
         } else {
-            // User doesn't exist -> Register them, then log them in
-            $insert = $conn->prepare("INSERT INTO users (username, email, google_id) VALUES (?, ?, ?)");
-            $insert->bind_param("sss", $name, $email, $google_id);
+            // User doesn't exist -> Register them
+            // Note: We include 'Full_Name' and set a default 'Role'
+            $role = 'user';
+            $status = 'active';
+            $insert = $conn->prepare("INSERT INTO users (Full_Name, Username, email, google_id, Role, Status) VALUES (?, ?, ?, ?, ?, ?)");
+            $insert->bind_param("ssssss", $name, $name, $email, $google_id, $role, $status);
             $insert->execute();
-            $_SESSION['user_id'] = $conn->insert_id; // Grabs the newly created ID
+            
+            // Set sessions for the new user
+            $_SESSION['user_id']   = $conn->insert_id;
+            $_SESSION['username']  = $name;
+            $_SESSION['full_name'] = $name;
+            $_SESSION['role']      = $role;
         }
 
         // 4. Redirect back to your root homepage

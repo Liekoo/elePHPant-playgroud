@@ -273,7 +273,7 @@ if ($is_logged_in) {
 
 <div class="footer">🧋 Sip &amp; Savor Milk Tea — Made with love &amp; the finest ingredients</div>
 
-<div class="toast" id="toast">🧋 Added to your order!</div>
+<div class="toast" id="toast">✔️ Added to your order!</div>
 
 <script>
 function addToCart(productId, btn) {

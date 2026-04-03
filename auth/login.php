@@ -162,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="footer-links">
       <a href="register.php">Don't have an account? Join us</a>
       <hr class="divider" style="width:100%">
-      <a href="../user/shop.php" class="back">← Back to men u</a>
+      <a href="../user/shop.php" class="back">← Back to menu</a>
     </div>
   </div>
 </div>
