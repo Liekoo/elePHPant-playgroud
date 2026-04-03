@@ -3,51 +3,52 @@ require '../config.php';
 $pageTitle = 'Customer Types';
 
 if (isset($_GET['delete'])) {
-    $id = (int)$_GET['delete'];
-    $conn->query("DELETE FROM Customer_Type WHERE Customer_Type_ID = $id");
-    header('Location: customer_types.php?success=deleted');
+    $id   = (int)$_GET['delete'];
+    $used = $conn->query("SELECT COUNT(*) AS c FROM orders WHERE Customer_Type_ID = $id")->fetch_assoc()['c'];
+    if ($used > 0) {
+        header('Location: customer_types.php?error=inuse'); 
+    } else {
+        $conn->query("DELETE FROM customer_type WHERE Customer_Type_ID = $id");
+        header('Location: customer_types.php?success=deleted');
+    }
     exit;
 }
 
 $editRow = null;
 if (isset($_GET['edit'])) {
     $id = (int)$_GET['edit'];
-    $editRow = $conn->query("SELECT * FROM Customer_Type WHERE Customer_Type_ID = $id")->fetch_assoc();
+    $editRow = $conn->query("SELECT * FROM customer_type WHERE Customer_Type_ID = $id")->fetch_assoc();
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $desc = $conn->real_escape_string($_POST['Customer_Type_Description']);
-
     if (isset($_POST['Customer_Type_ID']) && $_POST['Customer_Type_ID'] !== '') {
         $id = (int)$_POST['Customer_Type_ID'];
-        $conn->query("UPDATE Customer_Type SET Customer_Type_Description = '$desc' WHERE Customer_Type_ID = $id");
+        $conn->query("UPDATE customer_type SET Customer_Type_Description = '$desc' WHERE Customer_Type_ID = $id");
         header('Location: customer_types.php?success=updated');
     } else {
-        $conn->query("INSERT INTO Customer_Type (Customer_Type_Description) VALUES ('$desc')");
+        $conn->query("INSERT INTO customer_type (Customer_Type_Description) VALUES ('$desc')");
         header('Location: customer_types.php?success=created');
     }
     exit;
 }
 
-$rows = $conn->query("SELECT * FROM Customer_Type ORDER BY Customer_Type_ID DESC");
+$rows = $conn->query("SELECT * FROM customer_type ORDER BY Customer_Type_ID DESC");
 require '../includes/header.php';
 ?>
-
-<div class="page-header">
-  <h1 class="page-title">Customer <span>Types</span></h1>
-</div>
+<div class="page-header"><h1 class="page-title">Customer <span>Types</span></h1></div>
 
 <?php if (isset($_GET['success'])): ?>
   <div class="alert alert-success">✓ Customer type <?= htmlspecialchars($_GET['success']) ?> successfully.</div>
 <?php endif; ?>
+<?php if (isset($_GET['error']) && $_GET['error'] === 'inuse'): ?>
+  <div class="alert alert-error">✕ Cannot delete — this customer type is linked to existing orders.</div>
+<?php endif; ?>
 
 <div class="card">
-  <div class="card-title"><?= $editRow ? 'Edit Type #' . $editRow['Customer_Type_ID'] : 'New Customer Type' ?></div>
+  <div class="card-title"><?= $editRow ? 'Edit Type #'.$editRow['Customer_Type_ID'] : 'New Customer Type' ?></div>
   <form method="POST">
-    <?php if ($editRow): ?>
-      <input type="hidden" name="Customer_Type_ID" value="<?= $editRow['Customer_Type_ID'] ?>">
-    <?php endif; ?>
-
+    <?php if ($editRow): ?><input type="hidden" name="Customer_Type_ID" value="<?= $editRow['Customer_Type_ID'] ?>"><?php endif; ?>
     <div class="form-grid">
       <div class="form-group">
         <label>Description</label>
@@ -55,14 +56,9 @@ require '../includes/header.php';
                value="<?= htmlspecialchars($editRow['Customer_Type_Description'] ?? '') ?>">
       </div>
     </div>
-
     <div class="form-actions">
-      <button type="submit" class="btn btn-primary">
-        <?= $editRow ? '✓ Update' : '+ Add Type' ?>
-      </button>
-      <?php if ($editRow): ?>
-        <a href="customer_types.php" class="btn btn-ghost">Cancel</a>
-      <?php endif; ?>
+      <button type="submit" class="btn btn-primary"><?= $editRow ? '✓ Update' : '+ Add Type' ?></button>
+      <?php if ($editRow): ?><a href="customer_types.php" class="btn btn-ghost">Cancel</a><?php endif; ?>
     </div>
   </form>
 </div>
@@ -71,23 +67,23 @@ require '../includes/header.php';
   <div class="card-title">All Customer Types</div>
   <div class="table-wrap">
     <table>
-      <thead>
-        <tr>
-          <th>#ID</th>
-          <th>Description</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
+      <thead><tr><th>#ID</th><th>Description</th><th>Orders</th><th>Actions</th></tr></thead>
       <tbody>
-        <?php while ($row = $rows->fetch_assoc()): ?>
+        <?php while ($row = $rows->fetch_assoc()):
+          $orderCount = $conn->query("SELECT COUNT(*) AS c FROM orders WHERE Customer_Type_ID = {$row['Customer_Type_ID']}")->fetch_assoc()['c'];
+        ?>
         <tr>
           <td class="mono">#<?= $row['Customer_Type_ID'] ?></td>
           <td><?= htmlspecialchars($row['Customer_Type_Description']) ?></td>
+          <td><span class="badge <?= $orderCount > 0 ? 'badge-blue' : 'badge-green' ?>"><?= $orderCount ?> orders</span></td>
           <td>
             <a href="?edit=<?= $row['Customer_Type_ID'] ?>" class="btn btn-ghost btn-sm">Edit</a>
-            <a href="?delete=<?= $row['Customer_Type_ID'] ?>"
-               class="btn btn-danger btn-sm"
-               onclick="return confirm('Delete this customer type?')">Del</a>
+            <?php if ($orderCount == 0): ?>
+              <a href="?delete=<?= $row['Customer_Type_ID'] ?>" class="btn btn-danger btn-sm"
+                 onclick="return confirm('Delete this customer type?')">Del</a>
+            <?php else: ?>
+              <span class="btn btn-sm" style="opacity:0.3;cursor:not-allowed;background:var(--border)">Del</span>
+            <?php endif; ?>
           </td>
         </tr>
         <?php endwhile; ?>
@@ -95,5 +91,4 @@ require '../includes/header.php';
     </table>
   </div>
 </div>
-
 <?php require '../includes/footer.php'; ?>

@@ -1,17 +1,17 @@
 <?php
 require '../config.php';
-$pageTitle = 'Dashboard2';
-$totalOrders   = $conn->query("SELECT COUNT(*) AS c FROM Orders")->fetch_assoc()['c'];
-$totalProducts = $conn->query("SELECT COUNT(*) AS c FROM Products")->fetch_assoc()['c'];
-$totalRevenue  = $conn->query("SELECT SUM(Order_Total) AS t FROM Orders")->fetch_assoc()['t'] ?? 0;
-$totalUsers    = $conn->query("SELECT COUNT(*) AS c FROM Users WHERE Role = 'user'")->fetch_assoc()['c'];
-$pendingOrders = $conn->query("SELECT COUNT(*) AS c FROM Orders WHERE Order_Status = 'Pending'")->fetch_assoc()['c'];
+$pageTitle = 'Dashboard';
+$totalOrders   = $conn->query("SELECT COUNT(*) AS c FROM orders")->fetch_assoc()['c'];
+$totalProducts = $conn->query("SELECT COUNT(*) AS c FROM products")->fetch_assoc()['c'];
+$totalRevenue  = $conn->query("SELECT SUM(Order_Total) AS t FROM orders")->fetch_assoc()['t'] ?? 0;
+$totalUsers    = $conn->query("SELECT COUNT(*) AS c FROM users WHERE Role = 'user'")->fetch_assoc()['c'];
+$pendingOrders = $conn->query("SELECT COUNT(*) AS c FROM orders WHERE Order_Status = 'Pending'")->fetch_assoc()['c'];
 $recentOrders  = $conn->query("
     SELECT o.Order_ID, u.Full_Name, p.Product_Name, o.Order_Quantity,
            o.Order_Total, o.Order_Status, o.Order_Date_Time
-    FROM Orders o
-    JOIN Products p ON o.Product_ID = p.Product_ID
-    JOIN Users u    ON o.User_ID    = u.User_ID
+    FROM orders o
+    JOIN products p ON o.Product_ID = p.Product_ID
+    JOIN users u    ON o.User_ID    = u.User_ID
     ORDER BY o.Order_Date_Time DESC LIMIT 8
 ");
 require '../includes/header.php';

@@ -4,14 +4,14 @@ $pageTitle = 'Users';
 
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
-    $conn->query("DELETE FROM Users WHERE User_ID = $id AND Role != 'admin'");
+    $conn->query("DELETE FROM users WHERE User_ID = $id AND Role != 'admin'");
     header('Location: users.php?success=deleted'); exit;
 }
 
 $editRow = null;
 if (isset($_GET['edit'])) {
     $id = (int)$_GET['edit'];
-    $editRow = $conn->query("SELECT * FROM Users WHERE User_ID = $id")->fetch_assoc();
+    $editRow = $conn->query("SELECT * FROM users WHERE User_ID = $id")->fetch_assoc();
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -28,18 +28,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hash = $conn->real_escape_string($hash);
             $pwd_sql = ", Password = '$hash'";
         }
-        $conn->query("UPDATE Users SET Full_Name='$full_name', Username='$username', Role='$role', Status='$status'$pwd_sql WHERE User_ID=$id");
+        $conn->query("UPDATE users SET Full_Name='$full_name', Username='$username', Role='$role', Status='$status'$pwd_sql WHERE User_ID=$id");
         header('Location: users.php?success=updated');
     } else {
         $hash = password_hash($_POST['Password'], PASSWORD_BCRYPT);
         $hash = $conn->real_escape_string($hash);
-        $conn->query("INSERT INTO Users (Full_Name, Username, Password, Role, Status) VALUES ('$full_name','$username','$hash','$role','$status')");
+        $conn->query("INSERT INTO users (Full_Name, Username, Password, Role, Status) VALUES ('$full_name','$username','$hash','$role','$status')");
         header('Location: users.php?success=created');
     }
     exit;
 }
 
-$users = $conn->query("SELECT * FROM Users ORDER BY Created_At DESC");
+$users = $conn->query("SELECT * FROM users ORDER BY Created_At DESC");
 require '../includes/header.php';
 ?>
 <div class="page-header"><h1 class="page-title">User<span>s</span></h1></div>

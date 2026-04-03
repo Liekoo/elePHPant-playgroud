@@ -4,7 +4,7 @@ $pageTitle = 'Products';
 
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
-    $conn->query("DELETE FROM Products WHERE Product_ID = $id");
+    $conn->query("DELETE FROM products WHERE Product_ID = $id");
     header('Location: products.php?success=deleted');
     exit;
 }
@@ -12,7 +12,7 @@ if (isset($_GET['delete'])) {
 $editRow = null;
 if (isset($_GET['edit'])) {
     $id = (int)$_GET['edit'];
-    $editRow = $conn->query("SELECT * FROM Products WHERE Product_ID = $id")->fetch_assoc();
+    $editRow = $conn->query("SELECT * FROM products WHERE Product_ID = $id")->fetch_assoc();
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['Product_ID']) && $_POST['Product_ID'] !== '') {
         $id = (int)$_POST['Product_ID'];
         $conn->query("
-            UPDATE Products SET
+            UPDATE products SET
                 Product_Name           = '$name',
                 Product_Price          = $price,
                 Product_Quantity_Stock = $stock,
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: products.php?success=updated');
     } else {
         $conn->query("
-            INSERT INTO Products (Product_Name, Product_Price, Product_Quantity_Stock, Product_Status, Product_Description)
+            INSERT INTO products (Product_Name, Product_Price, Product_Quantity_Stock, Product_Status, Product_Description)
             VALUES ('$name', $price, $stock, '$status', '$desc')
         ");
         header('Location: products.php?success=created');
@@ -44,8 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$products = $conn->query("SELECT * FROM Products ORDER BY Product_ID DESC");
-require '../includes/header.php';
+$products = $conn->query("SELECT * FROM products ORDER BY Product_ID DESC");
+require "../includes/header.php";
 ?>
 
 <div class="page-header">
@@ -102,7 +102,7 @@ require '../includes/header.php';
         <?= $editRow ? '✓ Update Product' : '+ Add Product' ?>
       </button>
       <?php if ($editRow): ?>
-        <a href="products.php" class="btn btn-ghost">Cancel</a>
+        <a href="/pos/vibe/admin/products.php" class="btn btn-ghost">Cancel</a>
       <?php endif; ?>
     </div>
   </form>
@@ -157,4 +157,4 @@ require '../includes/header.php';
   </div>
 </div>
 
-<?php require '../includes/footer.php'; ?>
+<?php require "../includes/footer.php"; ?>

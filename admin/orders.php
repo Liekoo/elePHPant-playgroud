@@ -6,7 +6,7 @@ $msg = $err = '';
 // --- DELETE ---
 if (isset($_GET['delete'])) {
     $id = (int)$_GET['delete'];
-    $conn->query("DELETE FROM Orders WHERE Order_ID = $id");
+    $conn->query("DELETE FROM orders WHERE Order_ID = $id");
     header('Location: orders.php?success=deleted');
     exit;
 }
@@ -15,7 +15,7 @@ if (isset($_GET['delete'])) {
 $editRow = null;
 if (isset($_GET['edit'])) {
     $id = (int)$_GET['edit'];
-    $editRow = $conn->query("SELECT * FROM Orders WHERE Order_ID = $id")->fetch_assoc();
+    $editRow = $conn->query("SELECT * FROM orders WHERE Order_ID = $id")->fetch_assoc();
 }
 
 // --- CREATE / UPDATE ---
@@ -27,13 +27,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $order_status     = $conn->real_escape_string($_POST['Order_Status']);
 
     // Fetch current product price
-    $priceRow = $conn->query("SELECT Product_Price FROM Products WHERE Product_ID = $product_id")->fetch_assoc();
+    $priceRow = $conn->query("SELECT Product_Price FROM products WHERE Product_ID = $product_id")->fetch_assoc();
     $product_price = $priceRow['Product_Price'];
 
     if (isset($_POST['Order_ID']) && $_POST['Order_ID'] !== '') {
         $id = (int)$_POST['Order_ID'];
         $conn->query("
-            UPDATE Orders SET
+            UPDATE orders SET
                 Product_ID       = $product_id,
                 Customer_Type_ID = $customer_type_id,
                 Payment_Type_ID  = $payment_type_id,
@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header('Location: orders.php?success=updated');
     } else {
         $conn->query("
-            INSERT INTO Orders (Product_ID, Customer_Type_ID, Payment_Type_ID, Order_Quantity, Product_Price, Order_Status)
+            INSERT INTO orders (Product_ID, Customer_Type_ID, Payment_Type_ID, Order_Quantity, Product_Price, Order_Status)
             VALUES ($product_id, $customer_type_id, $payment_type_id, $order_quantity, $product_price, '$order_status')
         ");
         header('Location: orders.php?success=created');
@@ -56,18 +56,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // --- READ ---
 $orders = $conn->query("
     SELECT o.*, p.Product_Name, ct.Customer_Type_Description, pt.Payment_Type_Description
-    FROM Orders o
-    JOIN Products p       ON o.Product_ID       = p.Product_ID
-    JOIN Customer_Type ct ON o.Customer_Type_ID  = ct.Customer_Type_ID
-    JOIN Payments_Type pt ON o.Payment_Type_ID   = pt.Payment_Type_ID
+    FROM orders o
+    JOIN products p       ON o.Product_ID       = p.Product_ID
+    JOIN customer_type ct ON o.Customer_Type_ID  = ct.Customer_Type_ID
+    JOIN payments_type pt ON o.Payment_Type_ID   = pt.Payment_Type_ID
     ORDER BY o.Order_Date_Time DESC
 ");
 
-$products      = $conn->query("SELECT Product_ID, Product_Name, Product_Price FROM Products");
-$customerTypes = $conn->query("SELECT * FROM Customer_Type");
-$paymentTypes  = $conn->query("SELECT * FROM Payments_Type");
+$products      = $conn->query("SELECT Product_ID, Product_Name, Product_Price FROM products");
+$customerTypes = $conn->query("SELECT * FROM customer_type");
+$paymentTypes  = $conn->query("SELECT * FROM payments_type");
 
-require '../includes/header.php';
+require "../includes/header.php";
 ?>
 
 <div class="page-header">
@@ -168,7 +168,7 @@ require '../includes/header.php';
         <?= $editRow ? '✓ Update Order' : '+ Add Order' ?>
       </button>
       <?php if ($editRow): ?>
-        <a href="orders.php" class="btn btn-ghost">Cancel</a>
+        <a href="/pos/vibe/admin/orders.php" class="btn btn-ghost">Cancel</a>
       <?php endif; ?>
     </div>
   </form>
@@ -245,4 +245,4 @@ function updateTotal() {
 }
 </script>
 
-<?php require '../includes/footer.php'; ?>
+<?php require "../includes/footer.php"; ?>

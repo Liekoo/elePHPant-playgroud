@@ -7,7 +7,7 @@ $uid = $_SESSION['user_id'];
 $cart_items = $conn->query("
     SELECT c.Cart_ID, c.Quantity, p.Product_ID, p.Product_Name, p.Product_Price, p.Product_Quantity_Stock,
            (c.Quantity * p.Product_Price) AS Subtotal
-    FROM Cart c JOIN Products p ON c.Product_ID = p.Product_ID
+    FROM cart c JOIN products p ON c.Product_ID = p.Product_ID
     WHERE c.User_ID = $uid
 ");
 
@@ -15,8 +15,8 @@ $items = [];
 $grand_total = 0;
 while ($r = $cart_items->fetch_assoc()) { $items[] = $r; $grand_total += $r['Subtotal']; }
 
-$payment_types = $conn->query("SELECT * FROM Payments_Type");
-$customer_types = $conn->query("SELECT * FROM Customer_Type");
+$payment_types = $conn->query("SELECT * FROM payments_type");
+$customer_types = $conn->query("SELECT * FROM customer_type");
 
 // Handle checkout
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['checkout'])) {
@@ -27,11 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['checkout'])) {
         $pid   = $item['Product_ID'];
         $qty   = $item['Quantity'];
         $price = $item['Product_Price'];
-        $conn->query("INSERT INTO Orders (User_ID, Product_ID, Customer_Type_ID, Payment_Type_ID, Order_Quantity, Product_Price)
+        $conn->query("INSERT INTO orders (User_ID, Product_ID, Customer_Type_ID, Payment_Type_ID, Order_Quantity, Product_Price)
                       VALUES ($uid, $pid, $customer_id, $payment_id, $qty, $price)");
-        $conn->query("UPDATE Products SET Product_Quantity_Stock = Product_Quantity_Stock - $qty WHERE Product_ID = $pid");
+        $conn->query("UPDATE products SET Product_Quantity_Stock = Product_Quantity_Stock - $qty WHERE Product_ID = $pid");
     }
-    $conn->query("DELETE FROM Cart WHERE User_ID = $uid");
+    $conn->query("DELETE FROM cart WHERE User_ID = $uid");
     header('Location: orders.php?success=1'); exit;
 }
 ?>

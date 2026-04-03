@@ -6,10 +6,10 @@ $uid = $_SESSION['user_id'];
 
 $orders = $conn->query("
     SELECT o.*, p.Product_Name, ct.Customer_Type_Description, pt.Payment_Type_Description
-    FROM Orders o
-    JOIN Products p       ON o.Product_ID       = p.Product_ID
-    JOIN Customer_Type ct ON o.Customer_Type_ID  = ct.Customer_Type_ID
-    JOIN Payments_Type pt ON o.Payment_Type_ID   = pt.Payment_Type_ID
+    FROM orders o
+    JOIN products p       ON o.Product_ID       = p.Product_ID
+    JOIN customer_type ct ON o.Customer_Type_ID  = ct.Customer_Type_ID
+    JOIN payments_type pt ON o.Payment_Type_ID   = pt.Payment_Type_ID
     WHERE o.User_ID = $uid
     ORDER BY o.Order_Date_Time DESC
 ");
