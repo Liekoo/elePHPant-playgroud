@@ -55,7 +55,7 @@ $defaultSize = $sizes[0] ?? null;
     .hero-content{position:relative;z-index:1}
     .hero-tag{display:inline-block;background:rgba(200,149,108,0.2);color:var(--brown-light);border:1px solid rgba(200,149,108,0.3);padding:5px 16px;border-radius:20px;font-size:12px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:16px}
     .hero-title{font-family:var(--serif);font-size:48px;color:var(--cream);line-height:1.15;margin-bottom:12px}.hero-title span{color:var(--brown-light)}
-    .hero-sub{font-size:15px;color:rgba(253,246,238,0.6);max-width:480px;margin:0 auto 32px;line-height:1.6}
+    .hero-sub{font-size:15px;color:rgba(253,246,238,0.6);max-width:480px;margin:0 auto 32px;line-height:1.6; transition: opacity 0.6s ease-in-out; min-height: 48px;display: flex;align-items: center;justify-content: center}
     .search-bar{display:flex;max-width:480px;margin:0 auto;border-radius:30px;overflow:hidden;background:var(--cream);box-shadow:0 4px 24px rgba(0,0,0,0.2)}
     .search-bar input{background:transparent;border:none;color:var(--text);font-family:var(--sans);font-size:14px;padding:14px 22px;outline:none;flex:1}.search-bar input::placeholder{color:var(--text-muted)}
     .search-bar button{padding:14px 24px;background:var(--brown);color:var(--cream);border:none;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;transition:background 0.15s}.search-bar button:hover{background:var(--brown-dark)}
@@ -217,7 +217,7 @@ $defaultSize = $sizes[0] ?? null;
   <div class="hero-content">
     <div class="hero-tag">☕ Fresh &amp; Handcrafted</div>
     <h1 class="hero-title">Every sip tells a<br><span>sweet story</span></h1>
-    <p class="hero-sub">Crafted with the finest tea, fresh milk, and love. Find your perfect cup today.</p>
+    <p class="hero-sub" id="hero-dynamic-text" >Crafted with the finest tea, fresh milk, and love. Find your perfect cup today.</p>
     <form class="search-bar" method="GET">
       <input type="text" name="search" placeholder="Search for your favorite drink..." value="<?= htmlspecialchars($search) ?>" autocomplete="off">
       <button type="submit">Search</button>
@@ -378,6 +378,33 @@ function addToCart(productId, btn) {
     setTimeout(() => t.classList.remove('show'), 2500);
   });
 }
+
+const heroStrings = [
+  "Crafted with the finest tea, fresh milk, and love. Find your perfect cup today.",
+  "From classic pearls to creamy cheesecake foams—we have it all.",
+  "Experience the perfect balance of sweetness and tradition in every cup.",
+  "Your daily dose of happiness is just one sip away."
+];
+
+let heroIndex = 0;
+const heroElement = document.getElementById('hero-dynamic-text');
+
+function rotateHeroText() {
+  // 1. Start Fade Out
+  heroElement.style.opacity = 0;
+
+  setTimeout(() => {
+    // 2. Change text after fade out finishes
+    heroIndex = (heroIndex + 1) % heroStrings.length;
+    heroElement.textContent = heroStrings[heroIndex];
+    
+    // 3. Fade In
+    heroElement.style.opacity = 1;
+  }, 600); // This matches the 0.6s transition in your CSS
+}
+
+// Start the rotation every 5 seconds
+setInterval(rotateHeroText, 5000);
 
 </script>
 </body>
