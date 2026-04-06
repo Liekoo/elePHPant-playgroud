@@ -168,7 +168,7 @@ require "../includes/header.php";
         <?= $editRow ? '✓ Update Order' : '+ Add Order' ?>
       </button>
       <?php if ($editRow): ?>
-        <a href="/pos/vibe/admin/orders.php" class="btn btn-ghost">Cancel</a>
+        <a href="/admin/orders.php" class="btn btn-ghost">Cancel</a>
       <?php endif; ?>
     </div>
   </form>

@@ -1,4 +1,19 @@
 <?php
+/**
+ * CUSTOMER — user/orders.php
+ * -------------------------------------------------------
+ * WHO SEES THIS: Logged-in customers (user role) only
+ * PURPOSE: Customer views their own order history
+ *
+ * WHAT CUSTOMERS CAN DO:
+ *   - View all their past and current orders
+ *   - See order status updates (Pending, Preparing, Ready for Pickup, Completed)
+ *   - Cancel their OWN orders — but only if status is still Pending
+ *   - See their special note/request per order
+ *
+ * Customers CANNOT: see other users orders, change status, manage anything
+ * -------------------------------------------------------
+ */
 require '../config.php';
 require_once '../includes/auth_check.php';
 require_login();
@@ -178,9 +193,10 @@ $pending_count = count(array_filter($rows, fn($r) => $r['Order_Status'] === 'Pen
     <h2 class="section-title">Order <span>History</span></h2>
     <?php foreach ($rows as $row):
       $badge = match($row['Order_Status']) {
-        'Completed'  => 'badge-completed',
+        'Completed'        => 'badge-completed',
         'Pending'    => 'badge-pending',
-        'Processing' => 'badge-processing',
+        'Preparing'        => 'badge-processing',
+        'Ready for Pickup' => 'badge-blue',
         'Cancelled'  => 'badge-cancelled',
         default      => 'badge-pending'
       };
