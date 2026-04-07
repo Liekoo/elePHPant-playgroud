@@ -67,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['checkout'])) {
     .topbar-right{display:flex;align-items:center;gap:12px}
     .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:30px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;border:none;text-decoration:none;transition:all 0.2s}
     .btn-outline{color:var(--cream2);background:transparent;border:1.5px solid rgba(253,246,238,0.25)}.btn-outline:hover{background:rgba(253,246,238,0.1)}
+    .btn-warm{color:var(--brown-deep);background:var(--brown-light)}.btn-warm:hover{background:var(--cream2);transform:translateY(-1px)}
     .logout-link{font-size:12px;color:rgba(253,246,238,0.4);text-decoration:none;font-family:var(--mono);transition:color 0.15s}.logout-link:hover{color:var(--rose)}
     .content{max-width:900px;margin:0 auto;padding:40px 24px}
     .page-title{font-family:var(--serif);font-size:32px;color:var(--brown-dark);margin-bottom:6px}
@@ -125,6 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['checkout'])) {
 <div class="topbar">
   <div class="logo">Sip &amp; <span>Savor</span></div>
   <div class="topbar-right">
+    <a href="shop.php" class="btn btn-warm">Home</a>
     <a href="orders.php" class="btn btn-outline">My Orders</a>
     <a href="../auth/logout.php" class="logout-link">logout</a>
   </div>

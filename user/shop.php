@@ -184,6 +184,7 @@ $defaultSize = $sizes[0] ?? null;
   <div class="topbar-right">
     <?php if ($is_logged_in): ?>
       <span class="user-chip">Hi, <?= htmlspecialchars($_SESSION['full_name']) ?> 👋</span>
+      <a href="shop.php" class="btn btn-warm">Home</a>
       <a href="orders.php" class="btn btn-outline">My Orders</a>
       <a href="cart.php" class="btn btn-cart">🛒 Cart <span class="cart-count" id="cartCount"><?= $cart_count ?></span></a>
       <a href="../auth/logout.php" class="logout-link">logout</a>
@@ -271,7 +272,7 @@ $defaultSize = $sizes[0] ?? null;
           <span class="size-label-text">Size</span>
           <?php foreach ($sizes as $idx => $sz): ?>
           <button type="button"
-            class="size-pill <?= $idx === 0 ? 'active' : '' ?>"
+            class="size-pill"
             onclick="selectSize(<?= $p['Product_ID'] ?>, <?= $sz['Size_ID'] ?>, <?= $sz['Size_Price'] ?>, <?= $p['Product_Price'] ?>, this)"
             data-size-id="<?= $sz['Size_ID'] ?>"
             data-addon="<?= $sz['Size_Price'] ?>">
@@ -284,9 +285,9 @@ $defaultSize = $sizes[0] ?? null;
       <?php endif; ?>
 
       <div class="product-footer">
-        <div class="product-price" id="price-<?= $p['Product_ID'] ?>">
-          ₱<?= number_format($p['Product_Price'] + ($defaultSize ? $defaultSize['Size_Price'] : 0), 2) ?>
-        </div>
+          <div class="product-price" id="price-<?= $p['Product_ID'] ?>">
+          ₱<?= number_format($p['Product_Price'], 2) ?>
+          </div>
         <div class="product-stock <?= $p['Product_Quantity_Stock'] <= 5 && $p['Product_Quantity_Stock'] > 0 ? 'stock-low' : '' ?>">
           <?= $p['Product_Quantity_Stock'] ?> available
         </div>
@@ -296,10 +297,10 @@ $defaultSize = $sizes[0] ?? null;
         <button class="add-btn" disabled>Sold Out</button>
       <?php elseif ($is_logged_in): ?>
         <button class="add-btn"
-          id="addbtn-<?= $p['Product_ID'] ?>"
-          data-product-id="<?= $p['Product_ID'] ?>"
-          data-selected-size="<?= $defaultSize ? $defaultSize['Size_ID'] : '' ?>"
-          onclick="addToCart(<?= $p['Product_ID'] ?>, this)">
+            id="addbtn-<?= $p['Product_ID'] ?>"
+            data-product-id="<?= $p['Product_ID'] ?>"
+            data-selected-size="" 
+            onclick="addToCart(<?= $p['Product_ID'] ?>, this)">
           + Add to Order
         </button>
       <?php else: ?>

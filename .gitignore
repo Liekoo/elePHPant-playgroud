@@ -1,6 +1,8 @@
 # --- Database & Environment ---
 .env
 config.php
+uploads
+.htaccess
 # (Add any other files containing DB_PASSWORD or API_KEYS)
 
 # --- Dependency Managers ---

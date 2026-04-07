@@ -148,7 +148,7 @@ $pending_count = count(array_filter($rows, fn($r) => $r['Order_Status'] === 'Pen
 <div class="topbar">
   <div class="logo">Sip &amp; <span>Savor</span></div>
   <div class="topbar-right">
-    <a href="shop.php" class="btn btn-warm">🧋 Menu</a>
+    <a href="shop.php" class="btn btn-warm">Home</a>
     <a href="cart.php" class="btn btn-outline">🛒 Cart</a>
     <a href="../auth/logout.php" class="logout-link">logout</a>
   </div>
