@@ -83,16 +83,16 @@
     <div class="name"><?= htmlspecialchars($_SESSION['full_name']) ?></div>
   </div>
   <div class="nav-section">Main</div>
-  <a href="/admin/dashboard.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : '' ?>"><span class="icon">◈</span> Dashboard</a>
+  <a href="../admin/dashboard.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'dashboard.php' ? 'active' : '' ?>"><span class="icon">◈</span> Dashboard</a>
   <div class="nav-section">Manage</div>
-  <a href="/admin/orders.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'orders.php' ? 'active' : '' ?>"><span class="icon">⊞</span> Orders</a>
-  <a href="/admin/products.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'products.php' ? 'active' : '' ?>"><span class="icon">⊟</span> Products</a>
-  <a href="/admin/users.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'users.php' ? 'active' : '' ?>"><span class="icon">⊕</span> Users</a>
-  <a href="/admin/customer_types.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'customer_types.php' ? 'active' : '' ?>"><span class="icon">◎</span> Customer Types</a>
-  <a href="/admin/sizes.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'sizes.php' ? 'active' : '' ?>"><span class="icon">⊘</span> Sizes</a>
-  <a href="/admin/payment_types.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'payment_types.php' ? 'active' : '' ?>"><span class="icon">⊗</span> Payment Types</a>
+  <a href="../admin/orders.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'orders.php' ? 'active' : '' ?>"><span class="icon">⊞</span> Orders</a>
+  <a href="../admin/products.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'products.php' ? 'active' : '' ?>"><span class="icon">⊟</span> Products</a>
+  <a href="../admin/users.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'users.php' ? 'active' : '' ?>"><span class="icon">⊕</span> Users</a>
+  <a href="../admin/customer_types.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'customer_types.php' ? 'active' : '' ?>"><span class="icon">◎</span> Customer Types</a>
+  <a href="../admin/sizes.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'sizes.php' ? 'active' : '' ?>"><span class="icon">⊘</span> Sizes</a>
+  <a href="../admin/payment_types.php" class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'payment_types.php' ? 'active' : '' ?>"><span class="icon">⊗</span> Payment Types</a>
   <div style="margin-top:auto">
-    <a href="/auth/logout.php" class="nav-link danger"><span class="icon">⏻</span> Logout</a>
+    <a href="../auth/logout.php" class="nav-link danger"><span class="icon">⏻</span> Logout</a>
   </div>
 </aside>
 <main class="main">
