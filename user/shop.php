@@ -55,57 +55,13 @@ $defaultSize = $sizes[0] ?? null;
     .hero-content{position:relative;z-index:1}
     .hero-tag{display:inline-block;background:rgba(200,149,108,0.2);color:var(--brown-light);border:1px solid rgba(200,149,108,0.3);padding:5px 16px;border-radius:20px;font-size:12px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:16px}
     .hero-title{font-family:var(--serif);font-size:48px;color:var(--cream);line-height:1.15;margin-bottom:12px}.hero-title span{color:var(--brown-light)}
-    .hero-sub{font-size:15px;color:rgba(253,246,238,0.6);max-width:480px;margin:0 auto 32px;line-height:1.6; transition: opacity 0.6s ease-in-out; min-height: 48px;display: flex;align-items: center;justify-content: center}
+    .hero-sub{font-size:15px;color:rgba(253,246,238,0.6);max-width:480px;margin:0 auto 32px;line-height:1.6}
     .search-bar{display:flex;max-width:480px;margin:0 auto;border-radius:30px;overflow:hidden;background:var(--cream);box-shadow:0 4px 24px rgba(0,0,0,0.2)}
     .search-bar input{background:transparent;border:none;color:var(--text);font-family:var(--sans);font-size:14px;padding:14px 22px;outline:none;flex:1}.search-bar input::placeholder{color:var(--text-muted)}
     .search-bar button{padding:14px 24px;background:var(--brown);color:var(--cream);border:none;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;transition:background 0.15s}.search-bar button:hover{background:var(--brown-dark)}
-    
-    /* Guest Banner Container */
-    .guest-banner {
-      background: var(--cream2); /* Darker background makes text pop */
-      border-bottom: 1px solid var(--border-dark);
-      padding: 10px 0;
-      overflow: hidden; /* Hides the text outside the edges */
-      position: relative;
-      white-space: nowrap;
-    }
 
-    /* The moving track */
-    .banner-track {
-      display: flex;
-      width: max-content;
-      animation: slideLeft 30s linear infinite; /* Adjust speed here (30s) */
-    }
-
-    .banner-content {
-      display: flex;
-      align-items: center;
-      gap: 60px; /* Space between messages */
-      padding-right: 60px;
-    }
-
-    .banner-content span, .banner-content strong {
-      font-size: 13px;
-      color: var(--brown-light);
-      font-family: var(--mono);
-    }
-
-    .banner-content strong {
-      color: var(--brown-light);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-
-    /* The Animation */
-    @keyframes slideLeft {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(-50%); } /* Move half the width for seamless loop */
-    }
-
-    /* Pause on hover so users can read */
-    .guest-banner:hover .banner-track {
-      animation-play-state: paused;
-    }
+    .guest-banner{background:var(--cream2);border-bottom:1px solid var(--border);padding:12px 40px;display:flex;align-items:center;justify-content:center;gap:16px;font-size:13px;color:var(--text-soft);flex-wrap:wrap}
+    .guest-banner strong{color:var(--brown-dark)}
 
     .content{padding:40px;max-width:1400px;margin:0 auto}
     .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
@@ -184,8 +140,8 @@ $defaultSize = $sizes[0] ?? null;
   <div class="topbar-right">
     <?php if ($is_logged_in): ?>
       <span class="user-chip">Hi, <?= htmlspecialchars($_SESSION['full_name']) ?> 👋</span>
-      <a href="shop.php" class="btn btn-warm">Home</a>
       <a href="orders.php" class="btn btn-outline">My Orders</a>
+      <a href="wallet.php" class="btn btn-outline">💳 ₱<?= number_format($conn->query("SELECT Wallet_Balance FROM users WHERE User_ID=$uid")->fetch_assoc()['Wallet_Balance'],2) ?></a>
       <a href="cart.php" class="btn btn-cart">🛒 Cart <span class="cart-count" id="cartCount"><?= $cart_count ?></span></a>
       <a href="../auth/logout.php" class="logout-link">logout</a>
     <?php else: ?>
@@ -197,20 +153,10 @@ $defaultSize = $sizes[0] ?? null;
 
 <?php if (!$is_logged_in): ?>
 <div class="guest-banner">
-  <div class="banner-track">
-    <div class="banner-content">
-      <span>🍵 Welcome! Browse our menu freely.</span>
-      <strong>Sign in to order your favorites.</strong>
-      <span>✨ Check out our new Strawberry Series!</span>
-      <strong>🧋 Get 10% off on your first order.</strong>
-    </div>
-    <div class="banner-content">
-      <span>🍵 Welcome! Browse our menu freely.</span>
-      <strong>Sign in to order your favorites.</strong>
-      <span>✨ Check out our new Strawberry Series!</span>
-      <strong>🧋 Get 10% off on your first order.</strong>
-    </div>
-  </div>
+  <span>🍵 Welcome! Browse our menu freely.</span>
+  <strong>Sign in to order your favorites.</strong>
+  <a href="../auth/login.php?redirect=user/shop.php" class="btn btn-warm" style="padding:6px 16px;font-size:12px">Sign In</a>
+  <a href="../auth/register.php" style="font-size:12px;color:var(--brown);font-weight:600;text-decoration:none">or Register</a>
 </div>
 <?php endif; ?>
 
@@ -218,7 +164,7 @@ $defaultSize = $sizes[0] ?? null;
   <div class="hero-content">
     <div class="hero-tag">☕ Fresh &amp; Handcrafted</div>
     <h1 class="hero-title">Every sip tells a<br><span>sweet story</span></h1>
-    <p class="hero-sub" id="hero-dynamic-text" >Crafted with the finest tea, fresh milk, and love. Find your perfect cup today.</p>
+    <p class="hero-sub">Crafted with the finest tea, fresh milk, and love. Find your perfect cup today.</p>
     <form class="search-bar" method="GET">
       <input type="text" name="search" placeholder="Search for your favorite drink..." value="<?= htmlspecialchars($search) ?>" autocomplete="off">
       <button type="submit">Search</button>
@@ -272,7 +218,7 @@ $defaultSize = $sizes[0] ?? null;
           <span class="size-label-text">Size</span>
           <?php foreach ($sizes as $idx => $sz): ?>
           <button type="button"
-            class="size-pill"
+            class="size-pill <?= $idx === 0 ? 'active' : '' ?>"
             onclick="selectSize(<?= $p['Product_ID'] ?>, <?= $sz['Size_ID'] ?>, <?= $sz['Size_Price'] ?>, <?= $p['Product_Price'] ?>, this)"
             data-size-id="<?= $sz['Size_ID'] ?>"
             data-addon="<?= $sz['Size_Price'] ?>">
@@ -285,9 +231,9 @@ $defaultSize = $sizes[0] ?? null;
       <?php endif; ?>
 
       <div class="product-footer">
-          <div class="product-price" id="price-<?= $p['Product_ID'] ?>">
-          ₱<?= number_format($p['Product_Price'], 2) ?>
-          </div>
+        <div class="product-price" id="price-<?= $p['Product_ID'] ?>">
+          ₱<?= number_format($p['Product_Price'] + ($defaultSize ? $defaultSize['Size_Price'] : 0), 2) ?>
+        </div>
         <div class="product-stock <?= $p['Product_Quantity_Stock'] <= 5 && $p['Product_Quantity_Stock'] > 0 ? 'stock-low' : '' ?>">
           <?= $p['Product_Quantity_Stock'] ?> available
         </div>
@@ -297,10 +243,10 @@ $defaultSize = $sizes[0] ?? null;
         <button class="add-btn" disabled>Sold Out</button>
       <?php elseif ($is_logged_in): ?>
         <button class="add-btn"
-            id="addbtn-<?= $p['Product_ID'] ?>"
-            data-product-id="<?= $p['Product_ID'] ?>"
-            data-selected-size="" 
-            onclick="addToCart(<?= $p['Product_ID'] ?>, this)">
+          id="addbtn-<?= $p['Product_ID'] ?>"
+          data-product-id="<?= $p['Product_ID'] ?>"
+          data-selected-size="<?= $defaultSize ? $defaultSize['Size_ID'] : '' ?>"
+          onclick="addToCart(<?= $p['Product_ID'] ?>, this)">
           + Add to Order
         </button>
       <?php else: ?>
@@ -319,50 +265,18 @@ $defaultSize = $sizes[0] ?? null;
 const selectedSizes = {};
 
 function selectSize(productId, sizeId, addon, basePrice, btn) {
+  btn.closest('.size-row').querySelectorAll('.size-pill').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  selectedSizes[productId] = sizeId;
+  const total = parseFloat(basePrice) + parseFloat(addon);
+  document.getElementById('price-' + productId).textContent = '₱' + total.toLocaleString('en-PH', {minimumFractionDigits:2,maximumFractionDigits:2});
   const addBtn = document.getElementById('addbtn-' + productId);
-  const priceDisplay = document.getElementById('price-' + productId);
-  
-  // Check if this button is already active (the "Double Click" logic)
-  if (btn.classList.contains('active')) {
-    // DESELECT: Remove active state and reset data
-    btn.classList.remove('active');
-    delete selectedSizes[productId];
-    
-    // Revert price to just the Base Price
-    priceDisplay.textContent = '₱' + parseFloat(basePrice).toLocaleString('en-PH', {minimumFractionDigits:2});
-    
-    // Clear the size from the Add to Cart button
-    if (addBtn) addBtn.dataset.selectedSize = '';
-  } else {
-    // SELECT: Normal behavior
-    // Remove active class from all other buttons in this specific product card
-    btn.closest('.size-row').querySelectorAll('.size-pill').forEach(b => b.classList.remove('active'));
-    
-    // Activate this button
-    btn.classList.add('active');
-    selectedSizes[productId] = sizeId;
-    
-    // Update price with the addon
-    const total = parseFloat(basePrice) + parseFloat(addon);
-    priceDisplay.textContent = '₱' + total.toLocaleString('en-PH', {minimumFractionDigits:2});
-    
-    // Update the Add to Cart button with the new Size ID
-    if (addBtn) addBtn.dataset.selectedSize = sizeId;
-  }
+  if (addBtn) addBtn.dataset.selectedSize = sizeId;
 }
 
 function addToCart(productId, btn) {
   const sizeId = btn.dataset.selectedSize || '';
-  
-  // Validation: Don't allow adding if no size is selected
-  if (!sizeId) {
-    alert("Please select a size first!");
-    return;
-  }
-
-  btn.disabled = true; 
-  btn.textContent = 'Adding...';
-  
+  btn.disabled = true; btn.textContent = 'Adding...';
   fetch('cart_action.php', {
     method: 'POST',
     headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -370,43 +284,13 @@ function addToCart(productId, btn) {
   })
   .then(r => r.json())
   .then(data => {
-    btn.disabled = false; 
-    btn.textContent = '+ Add to Order';
+    btn.disabled = false; btn.textContent = '+ Add to Order';
     document.getElementById('cartCount').textContent = data.cart_count;
-    
     const t = document.getElementById('toast');
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 2500);
   });
 }
-
-const heroStrings = [
-  "Crafted with the finest tea, fresh milk, and love. Find your perfect cup today.",
-  "From classic pearls to creamy cheesecake foams—we have it all.",
-  "Experience the perfect balance of sweetness and tradition in every cup.",
-  "Your daily dose of happiness is just one sip away."
-];
-
-let heroIndex = 0;
-const heroElement = document.getElementById('hero-dynamic-text');
-
-function rotateHeroText() {
-  // 1. Start Fade Out
-  heroElement.style.opacity = 0;
-
-  setTimeout(() => {
-    // 2. Change text after fade out finishes
-    heroIndex = (heroIndex + 1) % heroStrings.length;
-    heroElement.textContent = heroStrings[heroIndex];
-    
-    // 3. Fade In
-    heroElement.style.opacity = 1;
-  }, 600); // This matches the 0.6s transition in your CSS
-}
-
-// Start the rotation every 5 seconds
-setInterval(rotateHeroText, 5000);
-
 </script>
 </body>
 </html>
