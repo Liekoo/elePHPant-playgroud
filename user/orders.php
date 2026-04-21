@@ -9,9 +9,16 @@
  *   - View all their past and current orders
  *   - See order status updates (Pending, Preparing, Ready for Pickup, Completed)
  *   - Cancel their OWN orders — but only if status is still Pending
+ *   - Track their order in real-time (Preparing / Ready for Pickup)
  *   - See their special note/request per order
  *
  * Customers CANNOT: see other users orders, change status, manage anything
+ *
+ * TRACKER INTEGRATION:
+ *   - Node.js + Socket.io + Leaflet tracker runs on localhost:3000
+ *   - Customer opens a modal with the map embedded as an iframe
+ *   - Rider opens: http://localhost:3000?order_id=X&role=rider
+ *   - Customer sees: modal iframe → http://localhost:3000?order_id=X&role=customer
  * -------------------------------------------------------
  */
 require '../config.php';
@@ -19,13 +26,11 @@ require_once '../includes/auth_check.php';
 require_login();
 $uid = $_SESSION['user_id'];
 
-// Handle cancel
+// ── Handle cancel ──────────────────────────────────────────────────────────────
 if (isset($_GET['cancel'])) {
     $id = (int)$_GET['cancel'];
-    // Only allow cancel if it belongs to this user and is still Pending
     $conn->query("UPDATE orders SET Order_Status = 'Cancelled'
                   WHERE Order_ID = $id AND User_ID = $uid AND Order_Status = 'Pending'");
-    // Restore stock
     $order = $conn->query("SELECT Product_ID, Order_Quantity FROM orders WHERE Order_ID = $id")->fetch_assoc();
     if ($order) {
         $conn->query("UPDATE products SET Product_Quantity_Stock = Product_Quantity_Stock + {$order['Order_Quantity']}
@@ -34,6 +39,7 @@ if (isset($_GET['cancel'])) {
     header('Location: orders.php?cancelled=1'); exit;
 }
 
+// ── Fetch orders ───────────────────────────────────────────────────────────────
 $orders = $conn->query("
     SELECT o.*, p.Product_Name, p.Product_Image,
            ct.Customer_Type_Description, pt.Payment_Type_Description
@@ -51,122 +57,232 @@ while ($r = $orders->fetch_assoc()) $rows[] = $r;
 $total_orders  = count($rows);
 $total_spent   = array_sum(array_column($rows, 'Order_Total'));
 $pending_count = count(array_filter($rows, fn($r) => $r['Order_Status'] === 'Pending'));
+
+// Statuses eligible for live tracking
+$trackable = ['Preparing', 'Ready for Pickup'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Orders — Sip & Savor</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Orders</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono&display=swap" rel="stylesheet">
   <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{
-      --cream:#fdf6ee;--cream2:#f5e6d3;--cream3:#eddcc8;
-      --brown-light:#c8956c;--brown:#9b6a3e;--brown-dark:#6b3f1f;--brown-deep:#3d1f0a;
-      --rose:#d4856a;--sage:#7a9e7e;
-      --text:#2d1810;--text-soft:#7a5c45;--text-muted:#a8856a;
-      --border:#e8d5be;--border-dark:#d4bfa0;--card:#fff9f2;
-      --serif:'Playfair Display',serif;--sans:'DM Sans',sans-serif;--mono:'DM Mono',monospace;--radius:16px;
-    }
-    body{background:var(--cream);color:var(--text);font-family:var(--sans);min-height:100vh}
-    .topbar{background:var(--brown-deep);padding:0 40px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(61,31,10,0.3)}
-    .logo{font-family:var(--serif);font-size:20px;color:var(--cream)}.logo span{color:var(--brown-light)}
-    .topbar-right{display:flex;align-items:center;gap:12px}
-    .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:30px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;border:none;text-decoration:none;transition:all 0.2s}
-    .btn-warm{color:var(--brown-deep);background:var(--brown-light)}.btn-warm:hover{background:var(--cream2);transform:translateY(-1px)}
-    .btn-outline{color:var(--cream2);background:transparent;border:1.5px solid rgba(253,246,238,0.25)}.btn-outline:hover{background:rgba(253,246,238,0.1)}
-    .btn-cancel{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer;text-decoration:none;border:1.5px solid rgba(212,133,106,0.4);color:var(--rose);background:rgba(212,133,106,0.08);transition:all 0.2s}
-    .btn-cancel:hover{background:rgba(212,133,106,0.18);border-color:var(--rose)}
-    .logout-link{font-size:12px;color:rgba(253,246,238,0.4);text-decoration:none;font-family:var(--mono);transition:color 0.15s}.logout-link:hover{color:var(--rose)}
+/* ── Reset & Root ──────────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --water:#0070ff;--water-mid:#1588ff;--water-bright:#0097ff;--water-light:#00b1ff;
+  --sky:#e6f4ff;--sky2:#cceeff;--sky3:#b3e5fc;
+  --deep:#002d6e;--deep2:#003d8f;--navy:#001a4d;
+  --text:#051c3a;--text-soft:#2d5a8e;--text-muted:#5e8ab4;
+  --border:#b3d4f0;--border-dark:#7ab3e0;--card:#f5faff;
+  --serif:'Playfair Display',serif;--sans:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+  --radius:16px;
+  /* tracker accent */
+  --track:#00c896;--track-dark:#009e77;--track-glow:rgba(0,200,150,0.18);
+}
 
-    .hero-strip{background:linear-gradient(135deg,var(--brown-deep) 0%,#5c2d0e 100%);padding:36px 40px}
-    .hero-strip h1{font-family:var(--serif);font-size:32px;color:var(--cream);margin-bottom:4px}
-    .hero-strip h1 span{color:var(--brown-light)}
-    .hero-strip p{font-size:13px;color:rgba(253,246,238,0.5);font-family:var(--mono)}
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+body{background:#eef7ff;color:var(--text);font-family:var(--sans);min-height:100vh}
 
-    .content{max-width:960px;margin:0 auto;padding:36px 24px}
+/* ── Topbar ────────────────────────────────────────────────────────────────── */
+.topbar{background:var(--navy);padding:0 40px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(0,26,77,0.4)}
+.logo{font-family:var(--serif);font-size:20px;color:#e6f4ff}
+.logo span{color:var(--water-light)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 18px;border-radius:30px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;border:none;text-decoration:none;transition:all 0.2s}
+.btn-warm{color:#fff;background:var(--water)}
+.btn-warm:hover{background:var(--water-mid);transform:translateY(-1px)}
+.btn-outline{color:#cce8ff;background:transparent;border:1.5px solid rgba(0,177,255,0.3)}
+.btn-outline:hover{background:rgba(0,112,255,0.15)}
+.logout-link{font-size:12px;color:rgba(168,212,245,0.4);text-decoration:none;font-family:var(--mono);transition:color 0.15s}
+.logout-link:hover{color:var(--water-light)}
 
-    .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
-    .stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px}
-    .stat-label{font-size:11px;font-family:var(--mono);color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
-    .stat-value{font-family:var(--serif);font-size:28px;font-weight:700;color:var(--brown)}
+/* ── Hero ──────────────────────────────────────────────────────────────────── */
+.hero-strip{background:linear-gradient(135deg,var(--navy) 0%,var(--deep2) 100%);padding:36px 40px}
+.hero-strip h1{font-family:var(--serif);font-size:32px;color:#e6f4ff;margin-bottom:4px}
+.hero-strip h1 span{color:var(--water-light)}
+.hero-strip p{font-size:13px;color:rgba(168,212,245,0.55);font-family:var(--mono)}
 
-    .alert{padding:14px 18px;border-radius:var(--radius);margin-bottom:24px;font-family:var(--mono);font-size:13px}
-    .alert-success{background:rgba(122,158,126,0.12);border:1px solid rgba(122,158,126,0.3);color:var(--sage)}
-    .alert-cancel{background:rgba(212,133,106,0.1);border:1px solid rgba(212,133,106,0.25);color:var(--rose)}
+/* ── Content ───────────────────────────────────────────────────────────────── */
+.content{max-width:960px;margin:0 auto;padding:36px 24px}
 
-    .order-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;transition:box-shadow 0.2s,border-color 0.2s}
-    .order-card:hover{box-shadow:0 6px 24px rgba(155,106,62,0.1);border-color:var(--border-dark)}
-    .order-card-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--cream2);flex-wrap:wrap;gap:8px}
-    .order-id{font-family:var(--mono);font-size:12px;color:var(--text-muted)}
-    .order-date{font-family:var(--mono);font-size:11px;color:var(--text-muted)}
-    .order-card-body{display:flex;align-items:flex-start;gap:16px;padding:16px 20px}
-    .order-img{width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid var(--border);flex-shrink:0}
-    .order-img-placeholder{width:64px;height:64px;border-radius:10px;background:var(--cream3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0}
-    .order-info{flex:1;min-width:0}
-    .order-name{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--brown-dark);margin-bottom:5px}
-    .order-meta{font-size:12px;color:var(--text-muted);font-family:var(--mono);display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
-    .order-note{display:flex;align-items:flex-start;gap:6px;background:var(--cream2);border:1px dashed var(--border-dark);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text-soft);margin-top:6px;line-height:1.5}
-    .order-note .note-icon{flex-shrink:0;font-size:13px}
-    .order-right{text-align:right;flex-shrink:0}
-    .order-total{font-family:var(--serif);font-size:20px;font-weight:700;color:var(--brown);margin-bottom:4px}
-    .order-qty{font-size:11px;font-family:var(--mono);color:var(--text-muted);margin-bottom:8px}
+/* ── Stats ─────────────────────────────────────────────────────────────────── */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px}
+.stat-label{font-size:11px;font-family:var(--mono);color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.stat-value{font-family:var(--serif);font-size:28px;font-weight:700;color:var(--water)}
 
-    .badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-family:var(--mono);font-weight:600}
-    .badge-pending{background:rgba(200,149,108,0.15);color:var(--brown-light);border:1px solid rgba(200,149,108,0.3)}
-    .badge-processing{background:rgba(122,158,126,0.15);color:var(--sage);border:1px solid rgba(122,158,126,0.3)}
-    .badge-completed{background:rgba(122,158,126,0.2);color:#4a7a4e;border:1px solid rgba(122,158,126,0.4)}
-    .badge-cancelled{background:rgba(212,133,106,0.15);color:var(--rose);border:1px solid rgba(212,133,106,0.3)}
+/* ── Alerts ────────────────────────────────────────────────────────────────── */
+.alert{padding:14px 18px;border-radius:var(--radius);margin-bottom:24px;font-family:var(--mono);font-size:13px}
+.alert-success{background:rgba(0,151,255,0.08);border:1px solid rgba(0,151,255,0.25);color:var(--water-mid)}
+.alert-cancel{background:rgba(192,74,0,0.08);border:1px solid rgba(192,74,0,0.22);color:#c04a00}
 
-    .empty{text-align:center;padding:80px 20px}
-    .empty .icon{font-size:64px;margin-bottom:16px;opacity:0.4;display:block}
-    .empty h3{font-family:var(--serif);font-size:22px;color:var(--brown-dark);margin-bottom:8px}
-    .empty p{font-size:14px;color:var(--text-muted);margin-bottom:20px}
-    .empty a{display:inline-block;padding:11px 28px;background:var(--brown);color:var(--cream);border-radius:30px;text-decoration:none;font-weight:600;font-size:13px;transition:all 0.2s}
-    .empty a:hover{background:var(--brown-dark);transform:translateY(-1px);box-shadow:0 6px 16px rgba(155,106,62,0.3)}
+/* ── Order Cards ───────────────────────────────────────────────────────────── */
+.order-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;transition:box-shadow 0.2s,border-color 0.2s}
+.order-card:hover{box-shadow:0 6px 24px rgba(0,112,255,0.1);border-color:var(--border-dark)}
 
-    .section-title{font-family:var(--serif);font-size:20px;color:var(--brown-dark);margin-bottom:16px}
-    .section-title span{color:var(--brown-light)}
-    .footer{background:var(--brown-deep);color:rgba(253,246,238,0.4);text-align:center;padding:20px;font-size:12px;font-family:var(--mono);margin-top:60px}
+/* Trackable orders get a subtle green left-border pulse */
+.order-card.is-trackable{border-left:3px solid var(--track);animation:trackPulse 3s ease-in-out infinite}
+@keyframes trackPulse{0%,100%{border-left-color:var(--track)}50%{border-left-color:var(--track-dark)}}
 
-    /* Cancel modal */
-    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(61,31,10,0.5);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-    .modal-overlay.show{display:flex}
-    .modal{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:36px;max-width:380px;width:90%;text-align:center;box-shadow:0 24px 60px rgba(61,31,10,0.25)}
-    .modal-icon{font-size:48px;margin-bottom:12px}
-    .modal h3{font-family:var(--serif);font-size:22px;color:var(--brown-dark);margin-bottom:8px}
-    .modal p{font-size:13px;color:var(--text-muted);margin-bottom:24px;line-height:1.6}
-    .modal-actions{display:flex;gap:10px;justify-content:center}
-    .modal-actions .btn-confirm{padding:10px 24px;background:var(--rose);color:#fff;border:none;border-radius:30px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s}
-    .modal-actions .btn-confirm:hover{background:#c0694e}
-    .modal-actions .btn-back{padding:10px 24px;background:var(--cream2);color:var(--text-soft);border:1.5px solid var(--border);border-radius:30px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s}
-    .modal-actions .btn-back:hover{background:var(--cream3)}
+.order-card-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--sky);flex-wrap:wrap;gap:8px}
+.order-id{font-family:var(--mono);font-size:12px;color:var(--text-muted)}
+.order-date{font-family:var(--mono);font-size:11px;color:var(--text-muted)}
+.order-card-body{display:flex;align-items:flex-start;gap:16px;padding:16px 20px}
+.order-img{width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid var(--border);flex-shrink:0}
+.order-img-placeholder{width:64px;height:64px;border-radius:10px;background:var(--sky2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0}
+.order-info{flex:1;min-width:0}
+.order-name{font-family:var(--serif);font-size:16px;font-weight:600;color:var(--deep2);margin-bottom:5px}
+.order-meta{font-size:12px;color:var(--text-muted);font-family:var(--mono);display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.order-note{display:flex;align-items:flex-start;gap:6px;background:var(--sky);border:1px dashed var(--border-dark);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text-soft);margin-top:6px;line-height:1.5}
+.order-note .note-icon{flex-shrink:0;font-size:13px}
+.order-right{text-align:right;flex-shrink:0}
+.order-total{font-family:var(--serif);font-size:20px;font-weight:700;color:var(--water);margin-bottom:4px}
+.order-qty{font-size:11px;font-family:var(--mono);color:var(--text-muted);margin-bottom:8px}
+
+/* ── Action Buttons ────────────────────────────────────────────────────────── */
+.btn-cancel{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;font-family:var(--sans);cursor:pointer;text-decoration:none;border:1.5px solid rgba(192,74,0,0.3);color:#c04a00;background:rgba(192,74,0,0.07);transition:all 0.2s}
+.btn-cancel:hover{background:rgba(192,74,0,0.15);border-color:#c04a00}
+
+/* Track button — teal/green accent to stand out */
+.btn-track{display:inline-flex;align-items:center;gap:6px;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:700;font-family:var(--sans);cursor:pointer;text-decoration:none;border:1.5px solid var(--track);color:var(--track-dark);background:var(--track-glow);transition:all 0.2s;position:relative;overflow:hidden}
+.btn-track::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(0,200,150,0.15),transparent);transform:translateX(-100%);transition:transform 0.5s}
+.btn-track:hover::before{transform:translateX(100%)}
+.btn-track:hover{background:rgba(0,200,150,0.25);border-color:var(--track-dark);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,200,150,0.25)}
+.btn-track .pulse-dot{width:7px;height:7px;border-radius:50%;background:var(--track);display:inline-block;animation:dot-pulse 1.4s ease-in-out infinite}
+@keyframes dot-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.4;transform:scale(0.7)}}
+
+/* ── Badges ────────────────────────────────────────────────────────────────── */
+.badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-family:var(--mono);font-weight:600}
+.badge-pending{background:rgba(0,112,255,0.1);color:var(--water);border:1px solid rgba(0,112,255,0.25)}
+.badge-processing{background:rgba(0,177,255,0.12);color:var(--water-bright);border:1px solid rgba(0,177,255,0.3)}
+.badge-completed{background:rgba(0,151,255,0.15);color:var(--deep2);border:1px solid rgba(0,112,255,0.3)}
+.badge-cancelled{background:rgba(192,74,0,0.1);color:#c04a00;border:1px solid rgba(192,74,0,0.25)}
+.badge-blue{background:rgba(0,177,255,0.12);color:var(--water-mid);border:1px solid rgba(0,177,255,0.3)}
+.badge-pickup{background:rgba(0,200,150,0.12);color:var(--track-dark);border:1px solid rgba(0,200,150,0.3)}
+
+/* ── Empty State ───────────────────────────────────────────────────────────── */
+.empty{text-align:center;padding:80px 20px}
+.empty .icon{font-size:64px;margin-bottom:16px;opacity:0.4;display:block}
+.empty h3{font-family:var(--serif);font-size:22px;color:var(--deep2);margin-bottom:8px}
+.empty p{font-size:14px;color:var(--text-muted);margin-bottom:20px}
+.empty a{display:inline-block;padding:11px 28px;background:var(--water);color:#fff;border-radius:30px;text-decoration:none;font-weight:600;font-size:13px;transition:all 0.2s}
+.empty a:hover{background:var(--deep2);transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,112,255,0.3)}
+
+/* ── Section Title ─────────────────────────────────────────────────────────── */
+.section-title{font-family:var(--serif);font-size:20px;color:var(--deep2);margin-bottom:16px}
+.section-title span{color:var(--water)}
+
+/* ── Footer ────────────────────────────────────────────────────────────────── */
+.footer{background:var(--navy);color:rgba(168,212,245,0.4);text-align:center;padding:20px;font-size:12px;font-family:var(--mono);margin-top:60px}
+
+/* ── Cancel Modal ──────────────────────────────────────────────────────────── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,26,77,0.55);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:36px;max-width:380px;width:90%;text-align:center;box-shadow:0 24px 60px rgba(0,26,77,0.25)}
+.modal-icon{font-size:48px;margin-bottom:12px}
+.modal h3{font-family:var(--serif);font-size:22px;color:var(--deep2);margin-bottom:8px}
+.modal p{font-size:13px;color:var(--text-muted);margin-bottom:24px;line-height:1.6}
+.modal-actions{display:flex;gap:10px;justify-content:center}
+.modal-actions .btn-confirm{padding:10px 24px;background:#c04a00;color:#fff;border:none;border-radius:30px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s}
+.modal-actions .btn-confirm:hover{background:#a03800}
+.modal-actions .btn-back{padding:10px 24px;background:var(--sky);color:var(--text-soft);border:1.5px solid var(--border);border-radius:30px;font-family:var(--sans);font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s}
+.modal-actions .btn-back:hover{background:var(--sky2)}
+
+/* ── Track Modal ───────────────────────────────────────────────────────────── */
+.track-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,10,40,0.72);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.track-modal-overlay.show{display:flex}
+.track-modal{background:var(--navy);border:1px solid rgba(0,200,150,0.25);border-radius:24px;width:min(720px,96vw);max-height:90vh;overflow:hidden;box-shadow:0 32px 80px rgba(0,26,77,0.6),0 0 0 1px rgba(0,200,150,0.1);display:flex;flex-direction:column}
+
+/* Track modal header */
+.track-modal-header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid rgba(0,200,150,0.15);background:rgba(0,10,40,0.4);flex-shrink:0}
+.track-modal-title{display:flex;align-items:center;gap:10px}
+.track-modal-title .live-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(0,200,150,0.15);border:1px solid rgba(0,200,150,0.35);border-radius:20px;padding:3px 10px;font-size:11px;font-family:var(--mono);font-weight:700;color:var(--track);text-transform:uppercase;letter-spacing:1px}
+.track-modal-title .live-badge .live-dot{width:6px;height:6px;border-radius:50%;background:var(--track);animation:dot-pulse 1.2s ease-in-out infinite}
+.track-modal-title h3{font-family:var(--serif);font-size:18px;color:#e6f4ff;margin:0}
+.track-modal-meta{font-size:12px;font-family:var(--mono);color:rgba(168,212,245,0.45);margin-top:2px}
+.btn-close-track{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(168,212,245,0.6);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0}
+.btn-close-track:hover{background:rgba(255,255,255,0.12);color:#fff}
+
+/* Track modal body */
+.track-modal-body{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* Status timeline strip */
+.track-timeline{display:flex;align-items:center;padding:14px 24px;background:rgba(0,10,40,0.3);border-bottom:1px solid rgba(0,200,150,0.1);gap:0;overflow-x:auto;flex-shrink:0}
+.track-step{display:flex;align-items:center;gap:0;flex-shrink:0}
+.track-step-dot{width:28px;height:28px;border-radius:50%;border:2px solid rgba(168,212,245,0.2);display:flex;align-items:center;justify-content:center;font-size:12px;background:rgba(0,20,60,0.5);transition:all 0.3s}
+.track-step-dot.done{border-color:var(--track);background:rgba(0,200,150,0.18)}
+.track-step-dot.active{border-color:var(--track);background:rgba(0,200,150,0.25);box-shadow:0 0 0 4px rgba(0,200,150,0.12);animation:activeGlow 2s ease-in-out infinite}
+@keyframes activeGlow{0%,100%{box-shadow:0 0 0 4px rgba(0,200,150,0.12)}50%{box-shadow:0 0 0 8px rgba(0,200,150,0.06)}}
+.track-step-label{font-size:10px;font-family:var(--mono);color:rgba(168,212,245,0.4);margin-top:4px;white-space:nowrap}
+.track-step-label.active-label{color:var(--track);font-weight:700}
+.track-step-wrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+.track-connector{width:40px;height:2px;background:rgba(168,212,245,0.1);margin:0 4px;margin-bottom:14px;flex-shrink:0}
+.track-connector.done-line{background:var(--track)}
+
+/* Map iframe container */
+.track-map-wrap{flex:1;position:relative;min-height:340px}
+.track-map-wrap iframe{width:100%;height:100%;min-height:340px;border:none;display:block}
+
+/* Fallback info when tracker server is offline */
+.tracker-offline{display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:40px;text-align:center;background:rgba(0,10,40,0.5);height:100%}
+.tracker-offline.show{display:flex}
+.tracker-offline .offline-icon{font-size:48px;opacity:0.5}
+.tracker-offline p{font-size:13px;font-family:var(--mono);color:rgba(168,212,245,0.5);line-height:1.6;max-width:300px}
+.tracker-offline code{background:rgba(0,200,150,0.1);border:1px solid rgba(0,200,150,0.2);border-radius:6px;padding:2px 8px;font-family:var(--mono);font-size:12px;color:var(--track)}
+
+/* Rider share section */
+.track-footer{padding:12px 24px;border-top:1px solid rgba(0,200,150,0.1);background:rgba(0,10,40,0.3);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;flex-shrink:0}
+.track-footer-note{font-size:11px;font-family:var(--mono);color:rgba(168,212,245,0.35);line-height:1.5}
+.track-footer-note strong{color:rgba(168,212,245,0.6)}
+.btn-copy-rider{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:20px;font-size:11px;font-weight:700;font-family:var(--mono);cursor:pointer;border:1px solid rgba(0,200,150,0.3);color:var(--track);background:rgba(0,200,150,0.08);transition:all 0.2s}
+.btn-copy-rider:hover{background:rgba(0,200,150,0.16)}
+.btn-copy-rider.copied{color:#fff;background:var(--track-dark);border-color:var(--track-dark)}
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media(max-width:600px){
+  .topbar{padding:0 16px}
+  .hero-strip{padding:24px 16px}
+  .stats-row{grid-template-columns:repeat(3,1fr);gap:10px}
+  .stat-value{font-size:22px}
+  .order-card-body{flex-wrap:wrap}
+  .order-right{width:100%;display:flex;justify-content:space-between;align-items:center}
+  .track-modal{width:100vw;max-height:100dvh;border-radius:0;margin:0}
+  .track-connector{width:20px}
+}
   </style>
 </head>
 <body>
 
+<!-- ── Topbar ──────────────────────────────────────────────────────────────── -->
 <div class="topbar">
-  <div class="logo">Sip &amp; <span>Savor</span></div>
+  <div class="logo">Aqualuxe</div>
   <div class="topbar-right">
     <a href="shop.php" class="btn btn-warm">Home</a>
     <a href="cart.php" class="btn btn-outline">🛒 Cart</a>
-    <a href="../auth/logout.php" class="logout-link">logout</a>
+    <a href="../auth/logout.php" class="logout-link btn btn-outline">logout</a>
   </div>
 </div>
 
+<!-- ── Hero ───────────────────────────────────────────────────────────────── -->
 <div class="hero-strip">
   <h1>My <span>Orders</span></h1>
-  <p>Your sip history with us, <?= htmlspecialchars($_SESSION['full_name']) ?></p>
+  <p>Your order history, <?= htmlspecialchars($_SESSION['full_name']) ?></p>
 </div>
 
+<!-- ── Main Content ───────────────────────────────────────────────────────── -->
 <div class="content">
+
   <?php if (isset($_GET['success'])): ?>
-    <div class="alert alert-success">🧋 Your order has been placed! We'll have it ready soon.</div>
+    <div class="alert alert-success">💧 Your order has been placed! We'll have it ready soon.</div>
   <?php endif; ?>
   <?php if (isset($_GET['cancelled'])): ?>
     <div class="alert alert-cancel">✕ Order cancelled. Your stock has been restored.</div>
   <?php endif; ?>
 
+  <!-- Stats -->
   <div class="stats-row">
     <div class="stat-card">
       <div class="stat-label">Total Orders</div>
@@ -184,40 +300,60 @@ $pending_count = count(array_filter($rows, fn($r) => $r['Order_Status'] === 'Pen
 
   <?php if (empty($rows)): ?>
     <div class="empty">
-      <span class="icon">🍵</span>
+      <span class="icon">💧</span>
       <h3>No orders yet</h3>
       <p>Your order history will appear here once you place your first order.</p>
       <a href="shop.php">Browse the menu</a>
     </div>
+
   <?php else: ?>
     <h2 class="section-title">Order <span>History</span></h2>
+
     <?php foreach ($rows as $row):
+      $isTrackable = in_array($row['Order_Status'], $trackable);
+
       $badge = match($row['Order_Status']) {
         'Completed'        => 'badge-completed',
-        'Pending'    => 'badge-pending',
+        'Pending'          => 'badge-pending',
         'Preparing'        => 'badge-processing',
-        'Ready for Pickup' => 'badge-blue',
-        'Cancelled'  => 'badge-cancelled',
-        default      => 'badge-pending'
+        'Ready for Pickup' => 'badge-pickup',
+        'Cancelled'        => 'badge-cancelled',
+        default            => 'badge-pending'
       };
     ?>
-    <div class="order-card">
+    <div class="order-card<?= $isTrackable ? ' is-trackable' : '' ?>">
+
+      <!-- Card Header -->
       <div class="order-card-header">
         <span class="order-id">Order #<?= $row['Order_ID'] ?></span>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span class="badge <?= $badge ?>"><?= $row['Order_Status'] ?></span>
           <span class="order-date"><?= date('M d, Y · h:i A', strtotime($row['Order_Date_Time'])) ?></span>
+
           <?php if ($row['Order_Status'] === 'Pending'): ?>
-            <a href="#" class="btn-cancel" onclick="confirmCancel(<?= $row['Order_ID'] ?>); return false;">✕ Cancel</a>
+            <a href="#" class="btn-cancel"
+               onclick="confirmCancel(<?= $row['Order_ID'] ?>); return false;">
+              ✕ Cancel
+            </a>
+          <?php endif; ?>
+
+          <?php if ($isTrackable): ?>
+            <a href="#" class="btn-track"
+               onclick="openTracker(<?= $row['Order_ID'] ?>, '<?= htmlspecialchars(addslashes($row['Product_Name'])) ?>', '<?= $row['Order_Status'] ?>'); return false;">
+              <span class="pulse-dot"></span> Track Live
+            </a>
           <?php endif; ?>
         </div>
       </div>
+
+      <!-- Card Body -->
       <div class="order-card-body">
         <?php if (!empty($row['Product_Image'])): ?>
           <img class="order-img" src="../<?= htmlspecialchars($row['Product_Image']) ?>" alt="">
         <?php else: ?>
-          <div class="order-img-placeholder">🧋</div>
+          <div class="order-img-placeholder">💧</div>
         <?php endif; ?>
+
         <div class="order-info">
           <div class="order-name"><?= htmlspecialchars($row['Product_Name']) ?></div>
           <div class="order-meta">
@@ -233,6 +369,7 @@ $pending_count = count(array_filter($rows, fn($r) => $r['Order_Status'] === 'Pen
             </div>
           <?php endif; ?>
         </div>
+
         <div class="order-right">
           <div class="order-total">₱<?= number_format($row['Order_Total'], 2) ?></div>
           <div class="order-qty"><?= $row['Order_Quantity'] ?> × ₱<?= number_format($row['Product_Price'], 2) ?></div>
@@ -241,16 +378,18 @@ $pending_count = count(array_filter($rows, fn($r) => $r['Order_Status'] === 'Pen
     </div>
     <?php endforeach; ?>
   <?php endif; ?>
-</div>
+</div><!-- /.content -->
 
-<div class="footer">🧋 Sip &amp; Savor Milk Tea — Made with love &amp; the finest ingredients</div>
+<div class="footer">💧 Aqualuxe — Pure water, pure care, delivered to your door</div>
 
-<!-- Cancel confirmation modal -->
+<!-- ════════════════════════════════════════════════════════════════════════════
+     CANCEL CONFIRMATION MODAL
+════════════════════════════════════════════════════════════════════════════ -->
 <div class="modal-overlay" id="cancelModal">
   <div class="modal">
-    <div class="modal-icon">🍵</div>
+    <div class="modal-icon">💧</div>
     <h3>Cancel this order?</h3>
-    <p>Are you sure you want to cancel? This can't be undone, but your item stock will be restored.</p>
+    <p>Are you sure you want to cancel? This can't be undone, but your stock will be restored.</p>
     <div class="modal-actions">
       <button class="btn-back" onclick="closeModal()">Keep it</button>
       <a href="#" class="btn-confirm" id="confirmLink">Yes, cancel</a>
@@ -258,7 +397,129 @@ $pending_count = count(array_filter($rows, fn($r) => $r['Order_Status'] === 'Pen
   </div>
 </div>
 
+<!-- ════════════════════════════════════════════════════════════════════════════
+     LIVE TRACKER MODAL
+     - Opens an iframe to the Node.js realtime-tracker server on localhost:3000
+     - Customer connects as "role=customer" — receives location updates
+     - Rider opens the link separately as "role=rider" — sends GPS location
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="track-modal-overlay" id="trackModal">
+  <div class="track-modal">
+
+    <!-- Header -->
+    <div class="track-modal-header">
+      <div class="track-modal-title">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
+            <h3 id="trackModalTitle">Live Tracking</h3>
+            <span class="live-badge"><span class="live-dot"></span> Live</span>
+          </div>
+          <div class="track-modal-meta" id="trackModalMeta">Connecting to tracker…</div>
+        </div>
+      </div>
+      <button class="btn-close-track" onclick="closeTracker()" title="Close">✕</button>
+    </div>
+
+    <!-- Delivery Status Timeline -->
+    <div class="track-timeline">
+      <!-- Step: Pending -->
+      <div class="track-step">
+        <div class="track-step-wrap">
+          <div class="track-step-dot done" id="step-pending">✓</div>
+          <div class="track-step-label done">Ordered</div>
+        </div>
+      </div>
+      <div class="track-connector done-line" id="line-1"></div>
+
+      <!-- Step: Preparing -->
+      <div class="track-step">
+        <div class="track-step-wrap">
+          <div class="track-step-dot" id="step-preparing">⚙</div>
+          <div class="track-step-label" id="label-preparing">Preparing</div>
+        </div>
+      </div>
+      <div class="track-connector" id="line-2"></div>
+
+      <!-- Step: Out for Delivery (Ready for Pickup = rider en route) -->
+      <div class="track-step">
+        <div class="track-step-wrap">
+          <div class="track-step-dot" id="step-delivery">🚐</div>
+          <div class="track-step-label" id="label-delivery">On the Way</div>
+        </div>
+      </div>
+      <div class="track-connector" id="line-3"></div>
+
+      <!-- Step: Completed -->
+      <div class="track-step">
+        <div class="track-step-wrap">
+          <div class="track-step-dot" id="step-completed">🏠</div>
+          <div class="track-step-label" id="label-completed">Delivered</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Map Body -->
+    <div class="track-map-wrap" id="trackMapWrap">
+      <!--
+        The iframe points to your Node.js tracker server.
+        role=customer → the page only RECEIVES location (watches socket).
+        The tracker app.js must:
+          1. Read ?order_id from the URL
+          2. socket.emit("join-order", orderId)
+          3. On "receive-location" → update the Leaflet marker
+      -->
+      <iframe
+        id="trackIframe"
+        src="about:blank"
+        title="Live Delivery Map"
+        allow="geolocation"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups">
+      </iframe>
+
+      <!-- Shown if the Node.js server is not running -->
+      <div class="tracker-offline" id="trackerOffline">
+        <div class="offline-icon">📡</div>
+        <p>
+          The live tracker server is not running.<br>
+          Start it with: <code>npm start</code> inside your
+          <code>realtime-tracker</code> folder,<br>
+          then reopen this window.
+        </p>
+        <p style="margin-top:8px">
+          Rider link: <code id="riderLinkOffline"></code>
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer: rider URL copy helper (for admin/dispatch use) -->
+    <div class="track-footer">
+      <div class="track-footer-note">
+        <strong>Rider URL</strong> — share this with the delivery rider so their GPS streams to the map:
+        <br><span id="riderUrlDisplay" style="color:var(--track);font-family:var(--mono);font-size:11px"></span>
+      </div>
+      <button class="btn-copy-rider" id="btnCopyRider" onclick="copyRiderUrl()">
+        📋 Copy Rider Link
+      </button>
+    </div>
+
+  </div>
+</div><!-- /#trackModal -->
+
+<!-- ════════════════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════════════════════════ -->
 <script>
+/* ── Config ──────────────────────────────────────────────────────────────────
+   Change TRACKER_HOST if your Node.js runs on a different port or is exposed
+   via ngrok (e.g. "https://abcd1234.ngrok.io").
+   ─────────────────────────────────────────────────────────────────────────── */
+const TRACKER_HOST = 'http://localhost:3000';
+
+let currentOrderId   = null;
+let currentOrderName = '';
+let iframeCheckTimer = null;
+
+// ── Cancel Modal ──────────────────────────────────────────────────────────────
 function confirmCancel(orderId) {
   document.getElementById('confirmLink').href = '?cancel=' + orderId;
   document.getElementById('cancelModal').classList.add('show');
@@ -269,6 +530,147 @@ function closeModal() {
 document.getElementById('cancelModal').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
 });
+
+// ── Tracker Modal ─────────────────────────────────────────────────────────────
+function openTracker(orderId, productName, status) {
+  currentOrderId   = orderId;
+  currentOrderName = productName;
+
+  // Update header text
+  document.getElementById('trackModalTitle').textContent = 'Tracking Order #' + orderId;
+  document.getElementById('trackModalMeta').textContent  = productName + ' · ' + status;
+
+  // Update timeline based on current status
+  updateTimeline(status);
+
+  // Build URLs
+  const customerUrl = TRACKER_HOST + '?order_id=' + orderId + '&role=customer';
+  const riderUrl    = TRACKER_HOST + '?order_id=' + orderId + '&role=rider';
+
+  // Show rider URL in footer
+  document.getElementById('riderUrlDisplay').textContent = riderUrl;
+  document.getElementById('riderLinkOffline').textContent = riderUrl;
+
+  // Load iframe
+  const iframe = document.getElementById('trackIframe');
+  iframe.src   = customerUrl;
+
+  // Hide offline notice initially
+  document.getElementById('trackerOffline').classList.remove('show');
+  iframe.style.display = 'block';
+
+  // Check if server responded (iframe load event)
+  iframe.onload = function() {
+    // If the tracker server is running, the iframe loads fine
+    clearTimeout(iframeCheckTimer);
+  };
+
+  // Fallback: if iframe doesn't load within 4 seconds, show offline notice
+  iframeCheckTimer = setTimeout(function() {
+    try {
+      // Cross-origin iframe access will throw — that means server IS up
+      const doc = iframe.contentDocument || iframe.contentWindow.document;
+      if (!doc || doc.title === '') throw new Error('empty');
+    } catch(e) {
+      // CORS error = server is running ✓ — do nothing
+      // If we hit here without CORS error, server may be offline
+    }
+    // Just silently keep the iframe — let the user see if it loaded
+  }, 4000);
+
+  // Show modal
+  document.getElementById('trackModal').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeTracker() {
+  document.getElementById('trackModal').classList.remove('show');
+  document.body.style.overflow = '';
+  clearTimeout(iframeCheckTimer);
+
+  // Unload iframe to stop socket connection
+  setTimeout(function() {
+    document.getElementById('trackIframe').src = 'about:blank';
+  }, 300);
+}
+
+// Close tracker modal on overlay click
+document.getElementById('trackModal').addEventListener('click', function(e) {
+  if (e.target === this) closeTracker();
+});
+
+// Escape key closes either modal
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    closeTracker();
+    closeModal();
+  }
+});
+
+// ── Timeline updater ──────────────────────────────────────────────────────────
+function updateTimeline(status) {
+  // Reset all
+  ['step-preparing','step-delivery','step-completed'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('done','active');
+  });
+  ['label-preparing','label-delivery','label-completed'].forEach(id => {
+    document.getElementById(id).classList.remove('active-label');
+  });
+  ['line-2','line-3'].forEach(id => {
+    document.getElementById(id).classList.remove('done-line');
+  });
+
+  if (status === 'Preparing') {
+    const dot = document.getElementById('step-preparing');
+    dot.classList.add('active');
+    document.getElementById('label-preparing').classList.add('active-label');
+    document.getElementById('line-1').classList.add('done-line');
+  }
+  else if (status === 'Ready for Pickup') {
+    document.getElementById('step-preparing').classList.add('done');
+    document.getElementById('step-preparing').textContent = '✓';
+    document.getElementById('line-1').classList.add('done-line');
+    document.getElementById('line-2').classList.add('done-line');
+
+    const dot = document.getElementById('step-delivery');
+    dot.classList.add('active');
+    document.getElementById('label-delivery').classList.add('active-label');
+  }
+  else if (status === 'Completed') {
+    ['step-preparing','step-delivery','step-completed'].forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.add('done');
+      el.textContent = '✓';
+    });
+    ['line-2','line-3','line-1'].forEach(id => {
+      document.getElementById(id).classList.add('done-line');
+    });
+  }
+}
+
+// ── Copy Rider URL ────────────────────────────────────────────────────────────
+function copyRiderUrl() {
+  const url = TRACKER_HOST + '?order_id=' + currentOrderId + '&role=rider';
+  navigator.clipboard.writeText(url).then(function() {
+    const btn = document.getElementById('btnCopyRider');
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(function() {
+      btn.textContent = '📋 Copy Rider Link';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(function() {
+    // Fallback for older browsers
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
 </script>
+
 </body>
 </html>
